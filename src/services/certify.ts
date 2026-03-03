@@ -13,13 +13,25 @@ function generateId(): string {
 // Hash the file on device
 async function hashFile(fileUri: string): Promise<string> {
   const fileContent = await FileSystem.readAsStringAsync(fileUri, {
-    encoding: 'base64' as any,
+    encoding: FileSystem.EncodingType.Base64,
   });
-  const hash = await Crypto.digestStringAsync(
+  
+  // Decode base64 to binary string and hash that
+  const binaryString = atob(fileContent);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  
+  const hashBuffer = await Crypto.digest(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    fileContent
+    bytes
   );
-  return hash;
+  
+  // Convert to hex string
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // Get GPS location

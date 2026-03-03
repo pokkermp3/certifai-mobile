@@ -69,7 +69,9 @@ export async function uploadFile(
 export async function getCertificate(id: string) {
   const response = await fetch(`${BASE_URL}/certificates/${id}`);
   if (!response.ok) throw new Error('Certificate not found');
-  return response.json();
+  const data = await response.json();
+  // Backend wraps it in { verified, message, certificate }
+  return data.certificate ?? data;
 }
 
 // List all certificates
