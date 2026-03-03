@@ -1,4 +1,4 @@
-const BASE_URL = 'http://10.88.233.1:8080/api/v1';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.88.233.1:8080/api/v1';
 
 // Step 1 — Register the capture
 export async function registerCapture(data: {

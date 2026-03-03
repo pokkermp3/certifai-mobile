@@ -4,6 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useState, useEffect } from 'react';
 import { getCertificate } from '../services/api';
+import { Certificate } from '../types/certificate';
 
 type Route = RouteProp<RootStackParamList, 'Certificate'>;
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Certificate'>;
@@ -11,7 +12,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'Certificate'>;
 export default function CertificateScreen() {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
-  const [certificate, setCertificate] = useState<any>(null);
+  const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,7 +75,7 @@ export default function CertificateScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>INTEGRITY</Text>
         <Row label="Device Hash" value={certificate.device_hash} mono />
-        <Row label="Server Hash" value={certificate.server_hash} mono />
+        <Row label="Server Hash" value={certificate.server_hash ?? '-'} mono />
         <Row label="Match" value={verified ? '✅ Verified' : '❌ Mismatch'} />
       </View>
 
@@ -95,7 +96,7 @@ export default function CertificateScreen() {
         {certificate.gps_lat && (
           <Row
             label="GPS"
-            value={`${certificate.gps_lat.toFixed(5)}, ${certificate.gps_lon.toFixed(5)}`}
+            value={`${certificate.gps_lat?.toFixed(5) ?? '?'}, ${certificate.gps_lon?.toFixed(5) ?? '?'}`}
           />
         )}
       </View>

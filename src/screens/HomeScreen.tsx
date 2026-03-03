@@ -1,21 +1,35 @@
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { listCertificates } from '../services/api';
-import { useState, useCallback } from 'react';
+import { Certificate } from '../types/certificate';
+import { useState, useCallback, useRef } from 'react';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
+const CACHE_TTL_MS = 30_000; // re-fetch only if 30 seconds have passed
+
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
-  const [certificates, setCertificates] = useState<any[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const lastFetchedAt = useRef<number>(0);
 
   useFocusEffect(
     useCallback(() => {
+      const now = Date.now();
+      const stale = now - lastFetchedAt.current > CACHE_TTL_MS;
+      if (!stale) return; // skip fetch if cache is still fresh
+
+      setLoading(true);
       listCertificates()
-        .then(data => setCertificates(data.certificates ?? []))
-        .catch(() => setCertificates([]));
+        .then(data => {
+          setCertificates(data.certificates ?? []);
+          lastFetchedAt.current = Date.now();
+        })
+        .catch(() => setCertificates([]))
+        .finally(() => setLoading(false));
     }, [])
   );
 
@@ -36,16 +50,27 @@ export default function HomeScreen() {
         <Text style={styles.buttonText}>📷  Capture & Certify</Text>
       </TouchableOpacity>
 
-      {certificates.length > 0 && (
-        <View style={styles.listSection}>
-          <Text style={styles.listTitle}>Recent Certificates</Text>
+      <View style={styles.listSection}>
+        <Text style={styles.listTitle}>Recent Certificates</Text>
+
+        {loading ? (
+          <ActivityIndicator
+            size="small"
+            color="#2563eb"
+            style={styles.loader}
+          />
+        ) : certificates.length === 0 ? (
+          <Text style={styles.emptyText}>No certificates yet</Text>
+        ) : (
           <FlatList
             data={certificates.slice(0, 10)}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.listItem}
-                onPress={() => navigation.navigate('Certificate', { certificateId: item.id })}
+                onPress={() =>
+                  navigation.navigate('Certificate', { certificateId: item.id })
+                }
               >
                 <Text style={styles.listItemName} numberOfLines={1}>
                   {item.file_name}
@@ -56,8 +81,8 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
           />
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -77,7 +102,15 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
   listSection: { marginTop: 40 },
-  listTitle: { color: '#888888', fontSize: 13, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  listTitle: {
+    color: '#888888',
+    fontSize: 13,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  loader: { marginTop: 24 },
+  emptyText: { color: '#555555', fontSize: 14, textAlign: 'center', marginTop: 24 },
   listItem: {
     backgroundColor: '#1a1a1a',
     padding: 16,
