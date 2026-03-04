@@ -15,6 +15,8 @@ export async function registerCapture(data: {
   device_model: string;
   os_version: string;
   app_version: string;
+  policyholder_name: string;
+  policyholder_dni: string;
 }): Promise<{ certificate_id: string; upload_url: string }> {
   const response = await fetch(`${BASE_URL}/certificates`, {
     method: 'POST',
@@ -42,8 +44,8 @@ export async function uploadFile(
   server_hash: string;
   device_hash: string;
   status: string;
-  pdf_url: string;
-  file_url: string;
+  pdf_download_url: string;
+  file_download_url: string;
 }> {
   const formData = new FormData();
   formData.append('file', {

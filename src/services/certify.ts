@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 import { registerCapture, uploadFile } from './api';
 import { Certificate } from '../types/certificate';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Generate a unique ID
 function generateId(): string {
@@ -58,6 +59,14 @@ async function getLocation(): Promise<{
   }
 }
 
+async function getPolicyholderInfo(): Promise<{ name: string; dni: string }> {
+  const [name, dni] = await Promise.all([
+    AsyncStorage.getItem('@certifai_user_name'),
+    AsyncStorage.getItem('@certifai_user_dni'),
+  ]);
+  return { name: name ?? '', dni: dni ?? '' };
+}
+
 // Main certification function
 export async function certifyFile(
   fileUri: string,
@@ -68,17 +77,20 @@ export async function certifyFile(
   const id = generateId();
   const capturedAt = new Date().toISOString();
 
-  // 1. Hash the file on device
-  const deviceHash = await hashFile(fileUri);
+  // 1. Hash + GPS in parallel
+  const [deviceHash, { lat, lon, accuracy }] = await Promise.all([
+    hashFile(fileUri),
+    getLocation(),
+  ]);
 
-  // 2. Get GPS
-  const { lat, lon, accuracy } = await getLocation();
-
-  // 3. Get device info
+  // 2. Get device info
   const deviceId = Device.osInternalBuildId ?? 'unknown';
   const deviceModel = `${Device.manufacturer} ${Device.modelName}`;
   const osVersion = `Android ${Device.osVersion}`;
   const appVersion = '1.0.0';
+
+  // 3. Get policyholder identity
+  const { name: policyholderName, dni: policyholderDni } = await getPolicyholderInfo();
 
   // 4. Register capture with backend
   const { certificate_id } = await registerCapture({
@@ -95,35 +107,35 @@ export async function certifyFile(
     device_model: deviceModel,
     os_version: osVersion,
     app_version: appVersion,
+    policyholder_name: policyholderName,
+    policyholder_dni: policyholderDni,
   });
 
   // 5. Upload the file
   const upload = await uploadFile(certificate_id, fileUri, fileName, mimeType);
 
   // 6. Return the certificate
-  return {
+     return {
     id: certificate_id,
-    fileName,
-    fileSize,
-    mimeType,
-    deviceHash,
-    serverHash: upload.server_hash,
-    hashVerified: upload.hash_verified,
+    case_id: '',
+    file_name: fileName,
+    file_size: fileSize,
+    mime_type: mimeType,
+    file_type: 'image',
+    device_hash: deviceHash,
+    server_hash: upload.server_hash,
+    hash_verified: upload.hash_verified,
     status: upload.hash_verified ? 'certified' : 'failed',
-    capturedAt,
-    gpsLat: lat,
-    gpsLon: lon,
-    pdfUrl: upload.pdf_url,
-    fileUrl: upload.file_url,
-    metadata: {
-      deviceId,
-      deviceModel,
-      osVersion,
-      appVersion,
-      gpsLat: lat,
-      gpsLon: lon,
-      gpsAccuracy: accuracy,
-      capturedAt,
-    },
+    captured_at: capturedAt,
+    certified_at: null,
+    gps_lat: lat,
+    gps_lon: lon,
+    gps_accuracy: accuracy,
+    gps_maps_url: lat && lon ? `https://maps.google.com/?q=${lat},${lon}` : null,
+    device_model: deviceModel,
+    os_version: osVersion,
+    app_version: appVersion,
+    pdf_url: upload.pdf_download_url,
+    file_url: upload.file_download_url,
   };
 }
